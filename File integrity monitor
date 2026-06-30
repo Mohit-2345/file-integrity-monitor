@@ -1,0 +1,79 @@
+import os
+import json
+import hashlib
+
+BASELINE_FILE = "baseline.json"
+
+def calculate_hash(filepath):
+    """Calculate SHA-256 hash of a file."""
+    sha256 = hashlib.sha256()
+
+    try:
+        with open(filepath, "rb") as f:
+            while chunk := f.read(4096):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+    except Exception as e:
+        print(f"Error reading {filepath}: {e}")
+        return None
+
+
+def create_baseline(directory):
+    """Create baseline hashes for all files."""
+    baseline = {}
+
+    for root, _, files in os.walk(directory):
+        for file in files:
+            path = os.path.join(root, file)
+            file_hash = calculate_hash(path)
+            if file_hash:
+                baseline[path] = file_hash
+
+    with open(BASELINE_FILE, "w") as f:
+        json.dump(baseline, f, indent=4)
+
+    print(f"Baseline saved to {BASELINE_FILE}")
+
+
+def monitor(directory):
+    """Compare current file hashes with the baseline."""
+    if not os.path.exists(BASELINE_FILE):
+        print("Baseline not found. Create one first.")
+        return
+
+    with open(BASELINE_FILE, "r") as f:
+        baseline = json.load(f)
+
+    current = {}
+
+    for root, _, files in os.walk(directory):
+        for file in files:
+            path = os.path.join(root, file)
+            file_hash = calculate_hash(path)
+            if file_hash:
+                current[path] = file_hash
+
+    for path, old_hash in baseline.items():
+        if path not in current:
+            print(f"[DELETED] {path}")
+        elif current[path] != old_hash:
+            print(f"[MODIFIED] {path}")
+
+    for path in current:
+        if path not in baseline:
+            print(f"[NEW] {path}")
+
+    print("Monitoring complete.")
+
+
+if __name__ == "__main__":
+    directory = input("Enter directory to monitor: ").strip()
+
+    choice = input("1. Create Baseline\n2. Monitor Files\nChoose (1/2): ")
+
+    if choice == "1":
+        create_baseline(directory)
+    elif choice == "2":
+        monitor(directory)
+    else:
+        print("Invalid choice.")
